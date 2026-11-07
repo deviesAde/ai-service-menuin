@@ -24,7 +24,7 @@ class RealtimeScannerProcessor(VideoProcessorBase):
     mencocokkan dengan katalog produk di RAM (< 5ms),
     dan menggambar HUD AR interaktif langsung di atas video streaming.
     """
-    def __init__(self, threshold: float = 0.72):
+    def __init__(self, threshold: float = 0.60):
         self.threshold = threshold
         self.extractor = FeatureExtractor()
         self.last_match = None
@@ -42,7 +42,7 @@ class RealtimeScannerProcessor(VideoProcessorBase):
         self.frame_count += 1
 
         # 1. Tentukan Kotak Bidik Tengah (Center Target Box)
-        box_size = int(min(h, w) * 0.65)
+        box_size = int(min(h, w) * 0.72)
         x1 = (w - box_size) // 2
         y1 = (h - box_size) // 2
         x2 = x1 + box_size

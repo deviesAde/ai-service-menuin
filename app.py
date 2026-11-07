@@ -37,6 +37,20 @@ except (ImportError, ModuleNotFoundError):
     )
     from feature_extractor import FeatureExtractor
 
+# WebRTC Real-Time Streaming
+try:
+    from streamlit_webrtc import webrtc_streamer, RTCConfiguration, WebRtcMode
+    try:
+        from backend.realtime_processor import RealtimeScannerProcessor
+    except ImportError:
+        from realtime_processor import RealtimeScannerProcessor
+    HAS_WEBRTC = True
+    RTC_CONFIG = RTCConfiguration(
+        {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+    )
+except Exception:
+    HAS_WEBRTC = False
+
 # ==========================================
 # STREAMLIT CONFIG & CUSTOM STYLING
 # ==========================================
@@ -159,14 +173,67 @@ with tab_scan:
         st.write(f"Siap mendeteksi produk dari **{len(products)} produk** terdaftar.")
 
         scan_method = st.radio(
-            "Pilih Metode Pemindaian:",
-            ["📸 Kamera Langsung (Snapshot Instan)", "📁 Upload Foto dari Komputer/HP"],
+            "Pilih Metode Scanner:",
+            [
+                "🔴 Live Real-Time (Video 30 FPS - Hasil Otomatis Muncul)",
+                "📸 Snapshot Kamera (Ambil Foto Langsung)",
+                "📁 Upload File Foto"
+            ],
             horizontal=True
         )
 
         query_image = None
 
-        if scan_method == "📸 Kamera Langsung (Snapshot Instan)":
+        if scan_method == "🔴 Live Real-Time (Video 30 FPS - Hasil Otomatis Muncul)":
+            if HAS_WEBRTC:
+                col_dir, _ = st.columns([1, 1])
+                with col_dir:
+                    cam_dir = st.selectbox("Pilih Kamera:", ["Kamera Belakang (HP)", "Kamera Depan (Laptop/Webcam)"])
+                facing = "environment" if "Belakang" in cam_dir else "user"
+
+                st.info("💡 **Kamera berjalan terus-menerus.** Arahkan produk ke kotak bidik di layar. **Hasil deteksi (nama, harga, stok) akan langsung muncul secara otomatis di atas video dan di bawah ini!**")
+
+                ctx = webrtc_streamer(
+                    key="realtime-product-scanner",
+                    mode=WebRtcMode.SENDRECV,
+                    rtc_configuration=RTC_CONFIG,
+                    video_processor_factory=lambda: RealtimeScannerProcessor(threshold=threshold),
+                    media_stream_constraints={
+                        "video": {
+                            "facingMode": facing,
+                            "width": {"ideal": 640},
+                            "height": {"ideal": 480}
+                        },
+                        "audio": False
+                    },
+                    async_processing=True,
+                )
+
+                # Ketika produk terdeteksi di video stream, tampilkan kartu detail langsung secara instan!
+                if ctx and ctx.video_processor:
+                    proc = ctx.video_processor
+                    if proc.last_match and proc.last_score >= threshold:
+                        p = proc.last_match
+                        sc = proc.last_score
+                        st.success(f"🎉 **PRODUK TERDETEKSI SECARA LIVE!** (Akurasi: {sc*100:.1f}%)")
+                        with st.container(border=True):
+                            c1, c2 = st.columns([1, 2])
+                            with c1:
+                                img_path = os.path.join(BASE_DIR, p["image_url"]) if p.get("image_url") else ""
+                                if img_path and os.path.exists(img_path):
+                                    st.image(img_path, use_container_width=True)
+                                else:
+                                    st.write("🖼️ [Foto Database]")
+                            with c2:
+                                st.markdown(f"### {p['name']}")
+                                st.caption(f"Kategori: **{p['category']}** • ID: #{p['id']}")
+                                st.markdown(f"<div class='price-tag'>Rp {p['price']:,}</div>".replace(",", "."), unsafe_allow_html=True)
+                                st.markdown(f"📦 Stok Tersedia: **{p['stock']} pcs**")
+                                st.progress(float(min(sc, 1.0)), text=f"Tingkat Kemiripan Visual: {sc*100:.1f}%")
+            else:
+                st.warning("WebRTC belum aktif di environment ini. Gunakan mode '📸 Snapshot Kamera' di atas.")
+
+        elif scan_method == "📸 Snapshot Kamera (Ambil Foto Langsung)":
             st.caption("Arahkan kamera ke kemasan produk, lalu klik tombol jepret di bawah:")
             cam_file = st.camera_input("Kamera Scanner")
             if cam_file is not None:
