@@ -6,20 +6,36 @@ import numpy as np
 from PIL import Image
 import streamlit as st
 
-# Setup sys.path agar modul backend dapat diakses
+# Setup sys.path agar modul backend dapat diakses di cloud maupun lokal
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(BASE_DIR, "backend"))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+backend_dir = os.path.join(BASE_DIR, "backend")
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
-from backend.database import (
-    init_db,
-    add_product,
-    get_all_products,
-    get_products_with_embeddings,
-    delete_product,
-    export_catalog_json,
-    import_catalog_json
-)
-from backend.feature_extractor import FeatureExtractor
+try:
+    from backend.database import (
+        init_db,
+        add_product,
+        get_all_products,
+        get_products_with_embeddings,
+        delete_product,
+        export_catalog_json,
+        import_catalog_json
+    )
+    from backend.feature_extractor import FeatureExtractor
+except (ImportError, ModuleNotFoundError):
+    from database import (
+        init_db,
+        add_product,
+        get_all_products,
+        get_products_with_embeddings,
+        delete_product,
+        export_catalog_json,
+        import_catalog_json
+    )
+    from feature_extractor import FeatureExtractor
 
 # ==========================================
 # STREAMLIT CONFIG & CUSTOM STYLING
