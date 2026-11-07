@@ -18,12 +18,23 @@ from backend.database import (
     delete_product
 )
 from backend.feature_extractor import FeatureExtractor
+from backend.realtime_processor import RealtimeScannerProcessor
+
+# WebRTC Real-Time Streaming
+try:
+    from streamlit_webrtc import webrtc_streamer, RTCConfiguration, WebRtcMode
+    HAS_WEBRTC = True
+    RTC_CONFIG = RTCConfiguration(
+        {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+    )
+except ImportError:
+    HAS_WEBRTC = False
 
 # ==========================================
 # STREAMLIT CONFIG & CUSTOM STYLING
 # ==========================================
 st.set_page_config(
-    page_title="ScanToko AI - Turbo Retail Scanner",
+    page_title="ScanToko AI - Real-Time Retail Scanner",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -52,6 +63,20 @@ st.markdown("""
         font-size: 0.72rem;
         font-weight: 700;
         letter-spacing: 0.5px;
+    }
+    .live-badge {
+        background: #ef4444;
+        color: white;
+        padding: 2px 7px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
     }
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
@@ -83,7 +108,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # ==========================================
 with st.sidebar:
     st.title("⚡ ScanToko AI")
-    st.markdown("<span class='turbo-badge'>TURBO ENGINE V2 • JIT ~5MS</span>", unsafe_allow_html=True)
+    st.markdown("<span class='turbo-badge'>REAL-TIME 30 FPS • JIT ~5MS</span>", unsafe_allow_html=True)
     st.write("")
     
     products, _ = get_products_with_embeddings(use_cache=True)
@@ -109,14 +134,14 @@ with st.sidebar:
             st.rerun()
 
     st.markdown("---")
-    st.caption("Engine: TorchScript JIT + OpenCV SIMD + In-Memory SQLite Cache")
+    st.caption("Engine: PyTorch JIT MobileNetV3 + WebRTC Streaming + SQLite RAM Cache")
 
 
 # ==========================================
 # MAIN TABS
 # ==========================================
 tab_scan, tab_upload, tab_catalog, tab_bench = st.tabs([
-    "📷 Scan Produk (Kamera / File)",
+    "🔴 Live Real-Time Scanner",
     "➕ Tambah / Upload Produk Baru",
     "📦 Katalog Produk (SQLite)",
     "⚡ Arsitektur & Optimasi Turbo"
@@ -124,95 +149,109 @@ tab_scan, tab_upload, tab_catalog, tab_bench = st.tabs([
 
 
 # ==============================================================================
-# TAB 1: SCAN PRODUK
+# TAB 1: LIVE REAL-TIME SCANNER
 # ==============================================================================
 with tab_scan:
-    st.subheader("📷 Pemindaian Produk Kemasan Toko")
+    st.subheader("🔴 Pemindaian Kamera Real-Time (Tanpa Tombol Scan)")
     
     products, embeddings_matrix = get_products_with_embeddings(use_cache=True)
     
     if len(products) == 0:
-        st.info("💡 **Database toko Anda masih kosong.** Silakan masuk ke tab **'➕ Tambah / Upload Produk Baru'** untuk mengunggah foto produk toko pertama Anda!")
+        st.info("💡 **Database toko Anda masih kosong.** Silakan masuk ke tab **'➕ Tambah / Upload Produk Baru'** untuk mendaftarkan produk pertama Anda!")
     else:
-        st.write(f"Siap memindai dari **{len(products)} produk** terdaftar dengan latensi ultra-cepat.")
+        st.write(f"Sistem siap mendeteksi secara langsung dari **{len(products)} produk** di database Anda.")
 
-        input_mode = st.radio(
-            "Pilih Metode Pemindaian:",
-            ["📸 Kamera Langsung (Webcam / HP)", "📁 Upload Foto Produk untuk Di-Scan"],
+        scan_mode = st.radio(
+            "Pilih Mode Kamera:",
+            ["🔴 Real-Time Live Streaming (Otomatis 30 FPS)", "📸 Mode Snapshot (Ambil Foto / Upload)"],
             horizontal=True
         )
 
-        query_image = None
+        if scan_mode == "🔴 Real-Time Live Streaming (Otomatis 30 FPS)":
+            st.markdown("""
+            > **Cara Kerja Real-Time:** 
+            > Klik **START** di bawah ini. Arahkan kemasan produk Anda ke dalam kotak bidik di layar. 
+            > Sistem akan **otomatis mendeteksi dan menampilkan banner harga/nama produk di atas video secara live** tanpa perlu menekan tombol apapun!
+            """)
 
-        if input_mode == "📸 Kamera Langsung (Webcam / HP)":
-            cam_file = st.camera_input("Arahkan kamera ke kemasan produk toko Anda")
-            if cam_file is not None:
-                query_image = Image.open(cam_file)
+            if HAS_WEBRTC:
+                webrtc_streamer(
+                    key="realtime-product-scanner",
+                    mode=WebRtcMode.SENDRECV,
+                    rtc_configuration=RTC_CONFIG,
+                    video_processor_factory=lambda: RealtimeScannerProcessor(threshold=threshold),
+                    media_stream_constraints={
+                        "video": {
+                            "facingMode": "environment",
+                            "width": {"ideal": 640},
+                            "height": {"ideal": 480}
+                        },
+                        "audio": False
+                    },
+                    async_processing=True,
+                )
+            else:
+                st.error("Paket `streamlit-webrtc` belum terpasang. Jalankan `pip install streamlit-webrtc av`.")
 
-        else:
-            uploaded_file = st.file_uploader(
-                "Pilih foto kemasan produk yang ingin dipindai:",
-                type=["jpg", "jpeg", "png", "webp"]
-            )
-            if uploaded_file is not None:
-                query_image = Image.open(uploaded_file)
+        else: # Mode Snapshot / Upload Foto
+            st.markdown("#### Mode Foto Manual:")
+            sub_mode = st.radio("Pilih Sumber:", ["📸 Kamera Laptop/HP (Snapshot)", "📁 Upload File Foto"], horizontal=True)
 
-        # ================= EKSEKUSI PENCOCOKAN AI TURBO =================
-        if query_image is not None:
-            st.divider()
-            col_img, col_res = st.columns([1, 1.3])
-            
-            with col_img:
-                st.image(query_image, caption="Foto yang Sedang Dipindai", use_container_width=True)
+            query_image = None
+            if sub_mode == "📸 Kamera Laptop/HP (Snapshot)":
+                cam_file = st.camera_input("Ambil foto kemasan produk")
+                if cam_file is not None:
+                    query_image = Image.open(cam_file)
+            else:
+                uploaded_file = st.file_uploader("Upload foto kemasan produk:", type=["jpg", "jpeg", "png", "webp"])
+                if uploaded_file is not None:
+                    query_image = Image.open(uploaded_file)
 
-            with col_res:
-                total_start = time.perf_counter()
+            if query_image is not None:
+                st.divider()
+                col_img, col_res = st.columns([1, 1.3])
+                with col_img:
+                    st.image(query_image, caption="Foto yang Dipindai", use_container_width=True)
 
-                # 1. Ekstraksi Vektor Fitur (TorchScript JIT + OpenCV)
-                ext_start = time.perf_counter()
-                query_vec = extractor.extract(query_image)
-                ext_ms = (time.perf_counter() - ext_start) * 1000
+                with col_res:
+                    total_start = time.perf_counter()
+                    ext_start = time.perf_counter()
+                    query_vec = extractor.extract(query_image)
+                    ext_ms = (time.perf_counter() - ext_start) * 1000
 
-                # 2. Vector Search via NumPy Matrix SIMD
-                search_start = time.perf_counter()
-                similarities = np.dot(embeddings_matrix, query_vec)
-                search_ms = (time.perf_counter() - search_start) * 1000
+                    search_start = time.perf_counter()
+                    similarities = np.dot(embeddings_matrix, query_vec)
+                    search_ms = (time.perf_counter() - search_start) * 1000
 
-                best_idx = int(np.argmax(similarities))
-                best_score = float(similarities[best_idx])
-                best_product = products[best_idx]
-                total_ms = (time.perf_counter() - total_start) * 1000
+                    best_idx = int(np.argmax(similarities))
+                    best_score = float(similarities[best_idx])
+                    best_product = products[best_idx]
+                    total_ms = (time.perf_counter() - total_start) * 1000
 
-                # 3. Tampilkan Metrik Latensi Presisi
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("⚡ Total Waktu", f"{total_ms:.1f} ms")
-                m2.metric("🧠 Ekstraksi AI", f"{ext_ms:.1f} ms")
-                m3.metric("🔍 Vektor Search", f"{search_ms:.3f} ms")
-                m4.metric("🎯 Akurasi", f"{best_score * 100:.1f} %")
+                    m1, m2, m3, m4 = st.columns(4)
+                    m1.metric("⚡ Total Waktu", f"{total_ms:.1f} ms")
+                    m2.metric("🧠 Ekstraksi AI", f"{ext_ms:.1f} ms")
+                    m3.metric("🔍 Vektor Search", f"{search_ms:.3f} ms")
+                    m4.metric("🎯 Akurasi", f"{best_score * 100:.1f} %")
 
-                st.write("")
-
-                # 4. Keputusan Pencocokan
-                if best_score >= threshold:
-                    st.success("✅ **PRODUK BERHASIL DIKENALI!**")
-                    
-                    with st.container(border=True):
-                        c1, c2 = st.columns([1, 2])
-                        with c1:
-                            if best_product["image_url"] and os.path.exists(os.path.join(BASE_DIR, best_product["image_url"])):
-                                st.image(os.path.join(BASE_DIR, best_product["image_url"]), use_container_width=True)
-                            else:
-                                st.write("🖼️ [Foto Database]")
-                        with c2:
-                            st.markdown(f"### {best_product['name']}")
-                            st.caption(f"Kategori: **{best_product['category']}** • ID: #{best_product['id']}")
-                            st.markdown(f"<div class='price-tag'>Rp {best_product['price']:,}</div>".replace(",", "."), unsafe_allow_html=True)
-                            st.markdown(f"📦 Stok Tersedia: **{best_product['stock']} pcs**")
-                            st.progress(min(float(best_score), 1.0), text=f"Tingkat Kemiripan Visual: {best_score*100:.1f}%")
-                else:
-                    st.warning("⚠️ **PRODUK TIDAK DIKENALI SECARA PASTI**")
-                    st.write(f"Kandidat terdekat: **{best_product['name']}** (Kemiripan `{best_score*100:.1f}%`, di bawah batas minimum `{threshold*100:.0f}%`).")
-                    st.info("💡 Pastikan produk dihadapkan tegak dengan pencahayaan cukup.")
+                    if best_score >= threshold:
+                        st.success("✅ **PRODUK BERHASIL DIKENALI!**")
+                        with st.container(border=True):
+                            c1, c2 = st.columns([1, 2])
+                            with c1:
+                                if best_product["image_url"] and os.path.exists(os.path.join(BASE_DIR, best_product["image_url"])):
+                                    st.image(os.path.join(BASE_DIR, best_product["image_url"]), use_container_width=True)
+                                else:
+                                    st.write("🖼️ [Foto Database]")
+                            with c2:
+                                st.markdown(f"### {best_product['name']}")
+                                st.caption(f"Kategori: **{best_product['category']}** • ID: #{best_product['id']}")
+                                st.markdown(f"<div class='price-tag'>Rp {best_product['price']:,}</div>".replace(",", "."), unsafe_allow_html=True)
+                                st.markdown(f"📦 Stok Tersedia: **{best_product['stock']} pcs**")
+                                st.progress(min(float(best_score), 1.0), text=f"Tingkat Kemiripan Visual: {best_score*100:.1f}%")
+                    else:
+                        st.warning("⚠️ **PRODUK TIDAK DIKENALI SECARA PASTI**")
+                        st.write(f"Kandidat terdekat: **{best_product['name']}** (Kemiripan `{best_score*100:.1f}%`).")
 
 
 # ==============================================================================
@@ -276,7 +315,7 @@ with tab_upload:
                     )
                     
                     st.success(f"🎉 **Sukses!** Produk **{nama_produk}** berhasil didaftarkan ke SQLite (ID #{new_id})!")
-                    st.info("Produk ini sekarang langsung dapat dikenali saat Anda melakukan scan kamera di tab 'Scan Produk'.")
+                    st.info("Produk ini sekarang langsung dapat dikenali secara real-time saat Anda menyalakan kamera di tab 'Live Real-Time Scanner'.")
 
 
 # ==============================================================================
@@ -290,7 +329,6 @@ with tab_catalog:
     if not all_prods:
         st.info("Belum ada produk yang didaftarkan. Gunakan tab **'➕ Tambah / Upload Produk Baru'** untuk menambahkan produk toko Anda.")
     else:
-        # Tampilkan dalam grid 3 kolom
         cols = st.columns(3)
         for idx, p in enumerate(all_prods):
             col = cols[idx % 3]
@@ -319,10 +357,10 @@ with tab_bench:
     st.subheader("⚡ 4 Pilar Optimasi Performa Turbo (< 10 ms)")
     
     st.markdown("""
-    Performa sistem telah dirombak secara menyeluruh dengan 4 teknik optimasi tingkat lanjut:
+    Performa sistem telah dirombak secara menyeluruh untuk pemindaian **Real-Time 30 FPS**:
 
     1. **TorchScript JIT Model Compilation:**
-       * PyTorch MobileNetV3 di-compile menggunakan `torch.jit.optimize_for_inference` yang memadukan operasi *convolution* dan *batch normalization*.
+       * PyTorch MobileNetV3 di-compile menggunakan `torch.jit.optimize_for_inference`.
        * Menghilangkan overhead interpreter Python, memangkas waktu eksekusi CPU hingga **~5 ms**.
     2. **OpenCV SIMD Preprocessing (8x Lebih Cepat dari PIL):**
        * Mengganti pipeline PIL biasa dengan *center crop* dan *resize* C++ OpenCV SIMD.
@@ -330,8 +368,8 @@ with tab_bench:
     3. **In-Memory Zero-Disk Vector Cache:**
        * Matriks vektor produk disimpan langsung di RAM (`threading.Lock` thread-safe).
        * Saat pemindaian kamera berjalan, sistem **tidak perlu membaca harddisk sama sekali (0 ms disk I/O)**.
-    4. **SQLite WAL Mode & 64MB Cache:**
-       * Database di-tune dengan `PRAGMA journal_mode = WAL` dan `PRAGMA synchronous = NORMAL`, memastikan registrasi produk baru instan tanpa mengunci proses scan.
+    4. **WebRTC Real-Time Streamer (Augmented Reality HUD):**
+       * Menjalankan feed kamera langsung 30 FPS dengan overlay nama & harga produk yang otomatis muncul di atas video!
     """)
 
     st.divider()
@@ -340,7 +378,6 @@ with tab_bench:
     
     if st.button("🚀 Jalankan Benchmark Turbo (100 Iterasi)", type="primary"):
         with st.spinner("Menguji kecepatan pipeline JIT + OpenCV + Vector Search..."):
-            # Buat sample gambar dan database 1.000 vektor
             sample_img = Image.new("RGB", (720, 720), color=(100, 150, 200))
             db_sim = np.random.randn(1000, 576).astype(np.float32)
             db_sim /= np.linalg.norm(db_sim, axis=1, keepdims=True)

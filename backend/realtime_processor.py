@@ -2,8 +2,12 @@ import cv2
 import numpy as np
 import time
 from typing import Tuple, Optional
-from database import get_products_with_embeddings
-from feature_extractor import FeatureExtractor
+try:
+    from backend.database import get_products_with_embeddings
+    from backend.feature_extractor import FeatureExtractor
+except ImportError:
+    from database import get_products_with_embeddings
+    from feature_extractor import FeatureExtractor
 
 try:
     import av
