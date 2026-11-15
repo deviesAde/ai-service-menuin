@@ -1,15 +1,28 @@
 services:
-  scantoko-ai:
+  # 1. Antarmuka Web Scanner (Streamlit) -> Port 8501
+  scantoko-web:
     image: ghcr.io/deviesade/ai-service-menuin:latest
     build: .
-    container_name: scantoko-ai
+    container_name: scantoko-web
     ports:
       - "8501:8501"
     volumes:
-      # Data produk & upload tetap tersimpan di laptop meski container dimatikan
       - ./uploads:/app/uploads
       - ./backend/products.db:/app/backend/products.db
     restart: unless-stopped
     environment:
       - STREAMLIT_SERVER_PORT=8501
       - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+
+  
+  scantoko-api:
+    image: ghcr.io/deviesade/ai-service-menuin:latest
+    build: .
+    container_name: scantoko-api
+    entrypoint: ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./backend/products.db:/app/backend/products.db
+    restart: unless-stopped

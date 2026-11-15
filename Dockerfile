@@ -38,8 +38,8 @@ COPY . .
 # Buat folder uploads jika belum ada
 RUN mkdir -p uploads
 
-# Expose port Streamlit
-EXPOSE 8501
+# Expose port Streamlit (8501) dan FastAPI (8000)
+EXPOSE 8501 8000
 
 # Healthcheck
 HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
