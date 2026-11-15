@@ -22,20 +22,30 @@ Scanner produk kemasan toko mandiri menggunakan **Streamlit**, model Deep Learni
 
 ## 🚀 Cara Menjalankan
 
-Cukup jalankan perintah berikut di terminal:
+### 1. Mode FastAPI Microservice (Untuk Integrasi Web Menuin POS):
+Jalankan perintah berikut di terminal:
+```bash
+python run_api.py
+```
+atau via uvicorn langsung:
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+- API Base URL: **`http://localhost:8000`**
+- Swagger Interactive Docs: **`http://localhost:8000/docs`**
+- Health Check: **`http://localhost:8000/health`**
 
+---
+
+### 2. Mode Standalone Streamlit (Aplikasi Preview Terpisah):
 ```bash
 python run.py
 ```
-
-atau langsung via Streamlit:
-
+atau langsung:
 ```bash
 streamlit run app.py
 ```
-
-Aplikasi otomatis terbuka di browser pada alamat:
-👉 **`http://localhost:8501`**
+Aplikasi terbuka di browser pada: **`http://localhost:8501`**
 
 ---
 
