@@ -6,6 +6,8 @@ echo Membangun dan menyalakan container Docker...
 echo Tidak perlu install Python atau PyTorch!
 echo.
 
+echo Mengunduh atau menyiapkan container...
+docker compose pull
 docker compose up -d --build
 
 if %ERRORLEVEL% NEQ 0 (

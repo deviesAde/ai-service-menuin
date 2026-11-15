@@ -1,5 +1,6 @@
 services:
   scantoko-ai:
+    image: ghcr.io/deviesade/ai-service-menuin:latest
     build: .
     container_name: scantoko-ai
     ports:
