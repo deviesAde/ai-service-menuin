@@ -22,22 +22,19 @@ Scanner produk kemasan toko mandiri menggunakan **Streamlit**, model Deep Learni
 
 ## 🚀 Cara Menjalankan
 
-### 1. Mode FastAPI Microservice (Untuk Integrasi Web Menuin POS):
-Jalankan perintah berikut di terminal:
+### 🐳 Opsi Paling Praktis (Tanpa Perlu Install Python/AI): Gunakan Docker!
+Teman Anda **tidak perlu menginstal Python, PyTorch, atau library apapun**. Cukup install Docker Desktop lalu jalankan:
+
 ```bash
-python run_api.py
+docker compose up -d --build
 ```
-atau via uvicorn langsung:
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-- API Base URL: **`http://localhost:8000`**
-- Swagger Interactive Docs: **`http://localhost:8000/docs`**
-- Health Check: **`http://localhost:8000/health`**
+*(Di Windows bisa langsung klik ganda file `start-docker.bat`)*
+
+Aplikasi otomatis terbuka di: **`http://localhost:8501`**.
 
 ---
 
-### 2. Mode Standalone Streamlit (Aplikasi Preview Terpisah):
+### 1. Mode Standalone Streamlit (Manual dengan Python):
 ```bash
 python run.py
 ```
@@ -46,6 +43,10 @@ atau langsung:
 streamlit run app.py
 ```
 Aplikasi terbuka di browser pada: **`http://localhost:8501`**
+
+---
+
+### 2. Mode FastAPI Microservice (Untuk Integrasi Web Menuin POS):
 
 ---
 
