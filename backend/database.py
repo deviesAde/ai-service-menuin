@@ -106,13 +106,16 @@ def get_products_with_embeddings(use_cache: bool = True) -> Tuple[List[Dict[str,
         
         if not rows:
             _cached_products = []
-            _cached_matrix = np.empty((0, 576), dtype=np.float32)
+            _cached_matrix = np.empty((0, 512), dtype=np.float32)
             return _cached_products, _cached_matrix
             
         products = []
         embeddings = []
         
         for row in rows:
+            vec = np.frombuffer(row["embedding"], dtype=np.float32)
+            if vec.shape[0] != 512:
+                continue
             p_dict = {
                 "id": row["id"],
                 "name": row["name"],
@@ -122,13 +125,17 @@ def get_products_with_embeddings(use_cache: bool = True) -> Tuple[List[Dict[str,
                 "image_url": row["image_url"]
             }
             products.append(p_dict)
-            vec = np.frombuffer(row["embedding"], dtype=np.float32)
             # Re-verify unit norm
             v_norm = np.linalg.norm(vec)
             if v_norm > 1e-6:
                 vec = vec / v_norm
             embeddings.append(vec)
             
+        if not embeddings:
+            _cached_products = []
+            _cached_matrix = np.empty((0, 512), dtype=np.float32)
+            return _cached_products, _cached_matrix
+
         _cached_products = products
         _cached_matrix = np.vstack(embeddings)
         return _cached_products, _cached_matrix

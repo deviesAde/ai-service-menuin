@@ -21,18 +21,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set direktori kerja
 WORKDIR /app
 
-# 1. Install PyTorch versi CPU khusus (hemat ~1.5 GB dibanding versi default CUDA)
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
-
-# 2. Copy & install dependencies lainnya
+# 1. Install dependencies (ONNX Runtime ringan tanpa PyTorch)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# 3. Pre-download model MobileNetV3 ke image agar saat container jalan langsung siap 100% (offline-ready)
-RUN python -c "import torchvision.models as models; models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)"
+# 2. Pre-download model MobileCLIP-S0 ONNX ke image agar container langsung siap 100% (offline-ready)
+RUN mkdir -p models && \
+    curl -fL -o models/mobileclip_s0_vision.onnx \
+      https://huggingface.co/Xenova/mobileclip_s0/resolve/main/onnx/vision_model.onnx
 
-# 4. Copy seluruh source code aplikasi
+# 3. Copy seluruh source code aplikasi
 COPY . .
 
 # Buat folder uploads jika belum ada
@@ -42,7 +41,7 @@ RUN mkdir -p uploads
 EXPOSE 8501 8000
 
 # Healthcheck
-HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
+HEALTHCHECK CMD curl --fail http://localhost:8000/health || exit 1
 
-# Jalankan Streamlit
-ENTRYPOINT ["streamlit", "run", "app.py"]
+# Jalankan FastAPI secara default (atau override via docker-compose untuk Streamlit)
+ENTRYPOINT ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

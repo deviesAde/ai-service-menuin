@@ -19,8 +19,8 @@ from backend.feature_extractor import FeatureExtractor
 
 app = FastAPI(
     title="Menuin AI Visual Scanner Service",
-    description="Microservice untuk ekstraksi fitur visual kemasan produk (MobileNetV3 576-dim) terintegrasi dengan Supabase",
-    version="1.0.0"
+    description="Microservice untuk ekstraksi fitur visual kemasan produk (MobileCLIP-S0 ONNX 512-dim)",
+    version="2.0.0"
 )
 
 # Enable CORS for Next.js web application
@@ -33,7 +33,7 @@ app.add_middleware(
 )
 
 # Singleton Feature Extractor
-print("[FastAPI] Inisialisasi FeatureExtractor MobileNetV3...")
+print("[FastAPI] Inisialisasi FeatureExtractor MobileCLIP-S0 (ONNX)...")
 extractor = FeatureExtractor()
 print("[FastAPI] AI Engine siap menerima permintaan!")
 
@@ -51,7 +51,10 @@ def root():
     return {
         "service": "Menuin AI Visual Scanner",
         "status": "online",
-        "version": "1.0.0",
+        "version": "2.0.0",
+        "model": extractor.MODEL_NAME,
+        "model_version": extractor.MODEL_VERSION,
+        "vector_dim": extractor.VECTOR_DIM,
         "endpoints": {
             "health": "/health",
             "extract_file": "/api/v1/extract-features (POST multipart/form-data)",
@@ -61,11 +64,15 @@ def root():
 
 @app.get("/health")
 def health():
+    is_ready = getattr(extractor, "is_ready", False)
     return {
-        "status": "healthy",
-        "model": "MobileNetV3 Small (TorchScript JIT)",
-        "vector_dim": 576,
-        "use_jit": getattr(extractor, "use_jit", False)
+        "status": "healthy" if is_ready else "degraded",
+        "model": extractor.MODEL_NAME,
+        "model_version": extractor.MODEL_VERSION,
+        "runtime": "onnxruntime",
+        "vector_dim": extractor.VECTOR_DIM,
+        "is_ready": is_ready,
+        "use_jit": is_ready,
     }
 
 @app.post("/api/v1/extract-features", response_model=ExtractResponse)
